@@ -1,0 +1,73 @@
+#!/usr/bin/bash
+# Let system services execute mise-managed node.
+#
+# portless installs a SYSTEM systemd unit whose ExecStart is the node binary
+# under ~/.local/share/mise/installs. systemd runs system units as init_t, and
+# Fedora's policy forbids init_t from executing files labelled data_home_t, so
+# the unit dies with 203/EXEC and the proxy never binds 443. The dev script then
+# reinstalls the service on every run, which is why it asks for a sudo password
+# every time.
+#
+# The fcontext rule persists in /etc, but a rule alone does not relabel files
+# that already exist, and mise creates a fresh directory on every node upgrade.
+# So this also runs restorecon each boot, which makes it self-healing.
+#
+# Narrowly scoped to node's bin directory on purpose. Anything writable that
+# carries bin_t can be executed by a system service, so this should cover as
+# little as possible.
+set -uo pipefail
+command -v semanage >/dev/null 2>&1 || exit 0
+command -v restorecon >/dev/null 2>&1 || exit 0
+[ "$(getenforce 2>/dev/null)" = "Disabled" ] && exit 0
+
+PATTERN='/var/home/[^/]+/\.local/share/mise/installs/node/[^/]+/bin(/.*)?'
+
+if ! semanage fcontext -l 2>/dev/null | grep -qF "$PATTERN"; then
+  semanage fcontext -a -t bin_t "$PATTERN" && echo "added fcontext rule for mise node"
+fi
+
+shopt -s nullglob
+found=0
+for d in /var/home/*/.local/share/mise/installs/node/*/bin; do
+  found=1
+  restorecon -R "$d" 2>/dev/null && echo "relabelled $d"
+done
+[ "$found" = 0 ] && echo "no mise node installs to relabel"
+
+# Relabelling at boot is not enough. mise creates a new directory on every node
+# upgrade and those files are born data_home_t, so a mid-session upgrade breaks
+# any system service pointing at node until something relabels it. Waiting for
+# the next boot, or for a poll interval, is a trap: the breakage appears hours
+# later with no visible link to the upgrade that caused it.
+#
+# So watch the directory instead and relabel the moment it changes. systemd path
+# units cannot glob, and the path is per-user, so write one unit per user that
+# actually has a mise node install.
+for nodedir in /var/home/*/.local/share/mise/installs/node; do
+  # Strip the prefix and take the first component; counting dirname calls up a
+  # fixed-depth path is easy to get wrong by one.
+  user=${nodedir#/var/home/}
+  user=${user%%/*}
+  [ -n "$user" ] || continue
+  unit="aurora-ani-mise-selinux-${user}.path"
+  path="/etc/systemd/system/${unit}"
+  want="[Unit]
+Description=Watch ${user}'s mise node installs for new versions
+ConditionSecurity=selinux
+
+[Path]
+PathChanged=${nodedir}
+Unit=aurora-ani-mise-selinux.service
+
+[Install]
+WantedBy=multi-user.target
+"
+  if [ ! -f "$path" ] || [ "$(cat "$path")" != "$want" ]; then
+    printf '%s' "$want" > "$path"
+    systemctl daemon-reload
+    echo "wrote $unit"
+  fi
+  systemctl is-enabled "$unit" >/dev/null 2>&1 || systemctl enable --now "$unit" >/dev/null 2>&1 \
+    && echo "watching ${nodedir}"
+done
+exit 0

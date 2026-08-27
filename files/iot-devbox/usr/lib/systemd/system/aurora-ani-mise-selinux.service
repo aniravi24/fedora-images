@@ -1,0 +1,14 @@
+[Unit]
+Description=Label mise-managed node so system services may execute it
+After=local-fs.target
+ConditionPathExists=/usr/libexec/aurora-ani-mise-selinux
+ConditionSecurity=selinux
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-mise-selinux
+RemainAfterExit=no
+TimeoutStartSec=2m
+
+[Install]
+WantedBy=multi-user.target
