@@ -1,0 +1,15 @@
+[Unit]
+Description=Re-label mise-managed node hourly
+ConditionSecurity=selinux
+
+[Timer]
+# Boot alone is not enough: mise creates a new directory on every node upgrade
+# and the files are born data_home_t, so a mid-session upgrade silently breaks
+# any system service pointing at node until something relabels it. Requiring a
+# reboot to fix that is a trap. restorecon on an unchanged tree costs nothing.
+OnBootSec=2min
+OnUnitActiveSec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
