@@ -25,6 +25,28 @@ modules:
       packages:
         - tailscale
         - audit
+        # Terminal setup, mirroring the aurora image's Brewfile so both machines
+        # feel the same. IoT has no Homebrew, so these come from Fedora; the six
+        # the repos do not carry (starship, lazydocker, dive, dust, doggo,
+        # watchman) come from mise, which this box already uses for everything.
+        - zsh
+        - chezmoi
+        - age
+        - atuin
+        - direnv
+        - zoxide
+        - eza
+        - bat
+        - fd-find
+        - ripgrep
+        - fzf
+        - yq
+        - gh
+        - k9s
+        - duf
+        - procs
+        - trash-cli
+        - tealdeer
         # semanage, for the mise/node SELinux relabel. IoT ships bare.
         - policycoreutils-python-utils
         - firewalld
@@ -73,6 +95,11 @@ modules:
         # dies with 203/EXEC and installdeps.sh reinstalls it, with sudo,
         # on every run.
         - aurora-ani-mise-selinux.service
+        # Sets zsh as the login shell and joins the developer groups, same as
+        # the desktop. Without it the box logs in to bash and none of the zsh
+        # config applies.
+        - aurora-ani-groups.service
+        - aurora-ani-groups.path
         - avahi-daemon.service
         - sshd.service
         - tailscaled.service

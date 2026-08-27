@@ -1,0 +1,38 @@
+#!/usr/bin/bash
+# Configures admin users: developer groups, and zsh as the login shell. Iterates members of `wheel`
+# rather than assuming uid 1000, since the image is built before users exist.
+set -uo pipefail
+
+WHEEL=$(getent group wheel | cut -d: -f4 | tr ',' ' ')
+[ -n "${WHEEL// }" ] || { echo "no wheel members yet, retrying next boot"; exit 0; }
+
+ZSH=/usr/bin/zsh
+
+# On an ostree system some groups exist only in /usr/lib/group, which is part of
+# the read-only image. usermod -aG then exits 0 and reports success while
+# changing nothing, because it cannot write there. The group line has to be
+# copied into /etc/group first. This is what `ujust dx-group` does with its
+# append_group(), and omitting it silently loses kvm and dialout.
+append_group() {
+  local g="$1"
+  grep -q "^$g:" /etc/group && return 0
+  grep -q "^$g:" /usr/lib/group || return 1
+  grep "^$g:" /usr/lib/group >> /etc/group && echo "copied $g into /etc/group"
+}
+
+for user in $WHEEL; do
+  for g in docker incus-admin libvirt lxd kvm adbusers dialout input; do
+    getent group "$g" >/dev/null 2>&1 || continue
+    append_group "$g" || continue
+    if ! id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx "$g"; then
+      usermod -aG "$g" "$user" && echo "added $user to $g"
+    fi
+  done
+
+  # The installer always creates the user with bash. The zsh config does the
+  # real work here (zprezto, powerlevel10k, `mise activate zsh`), so a bash
+  # login silently has no mise shims and every project tool looks missing.
+  if [ -x "$ZSH" ] && [ "$(getent passwd "$user" | cut -d: -f7)" != "$ZSH" ]; then
+    usermod -s "$ZSH" "$user" && echo "set $user login shell to $ZSH"
+  fi
+done
