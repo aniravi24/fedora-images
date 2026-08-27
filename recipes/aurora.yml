@@ -51,7 +51,6 @@ modules:
           - com.slack.Slack
           - us.zoom.Zoom
           - org.localsend.localsend_app
-          - com.visualstudio.code
           - com.google.AndroidStudio
           - com.getpostman.Postman
           - com.usebruno.Bruno
@@ -78,6 +77,38 @@ modules:
           - org.DolphinEmu.dolphin-emu
           - net.pcsx2.PCSX2
           - net.davidotek.pupgui2
+          # Aurora's own defaults. Only Bazaar is preinstalled automatically
+          # (/usr/share/flatpak/preinstall.d/), and that preinstall is applied
+          # once per remote: this module re-adds the flathub remote, which races
+          # flatpak-preinstall.service and leaves it stamped as done with nothing
+          # installed. The default panel pins Bazaar, so it ends up a dead
+          # launcher. The rest sit behind an interactive `ujust
+          # install-system-flatpaks`. Declaring them here covers both.
+          - io.github.kolunmi.Bazaar
+          - com.github.tchx84.Flatseal
+          - io.github.flattool.Warehouse
+          - io.github.DenysMb.Kontainer
+          - io.missioncenter.MissionCenter
+          - org.fedoraproject.MediaWriter
+          - org.fkoehler.KTailctl
+          - org.gnome.DejaDup
+          - org.gnome.Firmware
+          - org.gtk.Gtk3theme.Breeze
+          - org.deskflow.deskflow
+          - org.kde.haruna
+          - org.kde.kcalc
+          - org.kde.kclock
+          - org.kde.kontact
+          - org.kde.kweather
+          - org.kde.qrca
+          - org.kde.skanpage
+          - org.mozilla.thunderbird
+          # system-dx-flatpaks.Brewfile: never offered automatically, because
+          # install-system-flatpaks gates them on image-flavor matching "dx" and
+          # aurora-dx sets flavor "main".
+          - io.podman_desktop.PodmanDesktop
+          - io.github.getnf.embellish
+          - me.iepure.devtoolbox
       - notify: false
         scope: user
 
@@ -85,6 +116,7 @@ modules:
     system:
       enabled:
         - aurora-ani-groups.service
+        - aurora-ani-groups.path
         - docker.service
     user:
       enabled:

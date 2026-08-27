@@ -1,0 +1,15 @@
+[Unit]
+Description=Watch for user creation to update developer groups
+Documentation=man:systemd.path(5)
+
+[Path]
+# On an ISO install the user is created by initial-setup, after this image's
+# units have already run at multi-user.target. The service handles that by
+# exiting cleanly and retrying next boot, which works but costs a reboot before
+# docker, the group memberships and the user units do anything. Watching
+# /etc/passwd closes the gap: the service fires as soon as the user exists.
+PathChanged=/etc/passwd
+Unit=aurora-ani-groups.service
+
+[Install]
+WantedBy=multi-user.target
