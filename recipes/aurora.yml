@@ -52,18 +52,41 @@ modules:
         - dejavu-fonts-all
 
   # Handy (github.com/cjpais/Handy), offline speech-to-text. Not on Flathub and
-  # not in any Fedora repo. The release asset name embeds the version, so
+  # not in any Fedora repo; upstream ships direct downloads only, no repo to
+  # subscribe to. The release asset name embeds the version, so
   # /releases/latest/download/ cannot address it and a pinned URL would need
-  # bumping by hand. Resolve the latest release at build time instead: CI
-  # rebuilds weekly, so the image tracks upstream with nothing to maintain.
+  # bumping by hand. Resolve the latest release at build time instead.
+  #
+  # The RPM is UNSIGNED (rpm -qi shows "Signature: (none)"), so dnf verifies
+  # nothing when installing it from a URL. Upstream signs releases with Tauri's
+  # minisign updater key instead, publishing a base64-wrapped .sig alongside
+  # each asset and the public key in src-tauri/tauri.conf.json. Verify with
+  # that before installing, or this is an unverified binary from the internet
+  # running as a desktop app.
+  - type: dnf
+    install:
+      packages:
+        - minisign
+        - jq
+
   - type: script
     snippets:
       - |
         set -euo pipefail
-        url=$(curl -fsSL https://api.github.com/repos/cjpais/Handy/releases/latest \
-          | jq -er '.assets[] | select(.name | endswith("x86_64.rpm")) | .browser_download_url')
-        echo "installing Handy from $url"
-        dnf install -y "$url"
+        api=https://api.github.com/repos/cjpais/Handy/releases/latest
+        meta=$(curl -fsSL "$api")
+        url=$(jq -er '.assets[] | select(.name | endswith("x86_64.rpm")) | .browser_download_url' <<<"$meta")
+        tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+        curl -fsSL "$url"      -o "$tmp/handy.rpm"
+        curl -fsSL "$url.sig"  -o "$tmp/handy.rpm.sig.b64"
+        # Tauri base64-wraps the minisign signature file.
+        base64 -d "$tmp/handy.rpm.sig.b64" > "$tmp/handy.rpm.minisig"
+        curl -fsSL https://raw.githubusercontent.com/cjpais/Handy/main/src-tauri/tauri.conf.json \
+          | jq -er '.plugins.updater.pubkey' | base64 -d > "$tmp/handy.pub"
+        minisign -Vm "$tmp/handy.rpm" -p "$tmp/handy.pub" -x "$tmp/handy.rpm.minisig" \
+          || { echo "Handy signature verification FAILED"; exit 1; }
+        echo "installing $url"
+        dnf install -y "$tmp/handy.rpm"
 
   # Nerd Font glyphs for the shell prompt, eza, lazygit. Not packaged by
   # Fedora; this module refetches the latest on every image build.

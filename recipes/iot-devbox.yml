@@ -26,9 +26,12 @@ modules:
         - tailscale
         - audit
         # Terminal setup, mirroring the aurora image's Brewfile so both machines
-        # feel the same. IoT has no Homebrew, so these come from Fedora; the six
-        # the repos do not carry (starship, lazydocker, dive, dust, doggo,
-        # watchman) come from mise, which this box already uses for everything.
+        # feel the same. Aurora gets these from Homebrew only because the ublue
+        # base ships it; bootstrapping brew on IoT would mean a first-boot unit
+        # and a second update path for no gain, so they come from Fedora here
+        # and update with the image. starship is not packaged and is fetched
+        # from its GitHub release below. lazydocker, dive, dust, doggo and
+        # watchman are desktop conveniences and are deliberately not carried.
         - zsh
         - chezmoi
         - age
@@ -85,6 +88,34 @@ modules:
         - nss
         - pango
         - cairo
+
+  # starship is not in the Fedora repos. Resolve the latest release at build
+  # time rather than pinning a version: CI rebuilds, so it tracks upstream with
+  # nothing to maintain. Same approach as Handy in the aurora recipe.
+  #
+  # Not `curl | sh` with upstream's install.sh: that does arch detection we do
+  # not need in a fixed x86_64 image, and it does not verify anything. The
+  # release publishes a .sha256 per asset, so download, check, then extract.
+  - type: script
+    snippets:
+      - |
+        set -euo pipefail
+        api=https://api.github.com/repos/starship/starship/releases/latest
+        asset=starship-x86_64-unknown-linux-gnu.tar.gz
+        url=$(curl -fsSL "$api" | jq -er --arg a "$asset" \
+          '.assets[] | select(.name == $a) | .browser_download_url')
+        sha=$(curl -fsSL "$api" | jq -er --arg a "$asset.sha256" \
+          '.assets[] | select(.name == $a) | .browser_download_url')
+        tmp=$(mktemp -d)
+        curl -fsSL "$url" -o "$tmp/$asset"
+        curl -fsSL "$sha" -o "$tmp/$asset.sha256"
+        # upstream's .sha256 is the bare digest, so build a line checksum reads
+        echo "$(cat "$tmp/$asset.sha256" | tr -d '[:space:]')  $tmp/$asset" \
+          | sha256sum -c - || { echo "starship checksum mismatch"; exit 1; }
+        tar xzf "$tmp/$asset" -C /usr/bin starship
+        chmod 0755 /usr/bin/starship
+        rm -rf "$tmp"
+        /usr/bin/starship --version
 
   - type: systemd
     system:
