@@ -51,8 +51,8 @@ active_tty() {
   [ -n "$a" ] && echo "/dev/$a"
 }
 
-last=
 warned=
+wfail=
 while :; do
   tty=$(active_tty)
   if [ -z "$tty" ] || [ ! -e "$tty" ]; then
@@ -73,11 +73,21 @@ while :; do
   # into a path that no longer exists.
   if [ ! -e "${BL}bl_power" ]; then
     BL=$(find_backlight) || BL=/nonexistent/
-    last=
   fi
 
-  if [ "$want" != "$last" ]; then
-    { printf '%s\n' "$want" > "${BL}bl_power"; } 2>/dev/null && last=$want
+  # Compare against what the panel actually reports, not against what we last
+  # wrote. Anything else that touches bl_power - a console takeover, a DRM
+  # event - would otherwise leave the backlight on with this loop believing it
+  # had already set it, and it would never write again.
+  cur=$(cat "${BL}bl_power" 2>/dev/null)
+  if [ "$want" != "$cur" ]; then
+    if ! { printf '%s\n' "$want" > "${BL}bl_power"; } 2>/dev/null; then
+      # Do not silence this forever: a backlight that refuses writes is the
+      # difference between working and looking like it works.
+      [ -z "$wfail" ] && { echo "cannot write ${BL}bl_power" >&2; wfail=1; }
+    else
+      wfail=
+    fi
   fi
   sleep "$POLL"
 done
