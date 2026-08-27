@@ -1,61 +1,74 @@
 #!/usr/bin/bash
-# Weekly zprezto update. This is what the `zprezto-update` zsh function does,
-# written out so systemd can run it without an interactive shell.
+# Weekly zprezto update.
+#
+# Two halves. The modules under ~/.zprezto are upstream code and just get
+# pulled. The runcoms are different: ~/.zshrc and friends are local files that
+# started as upstream's templates, so upstream edits to those templates have to
+# be MERGED in rather than copied over, or local config is destroyed.
+#
+# That is a 3-way merge, and it needs a base: the upstream commit the local
+# files were last reconciled against, kept in $BASEFILE. On each update every
+# changed runcom is merged with `git merge-file`. Clean merges are applied. A
+# conflict leaves the file untouched, keeps the old base so the same merge is
+# retried next week, and raises a notification.
 #
 # Deliberately noisy on failure: a silent auto-updater that has been broken for
-# months is worse than no auto-updater. Anything unexpected raises a desktop
-# notification AND exits non-zero so the unit shows in `systemctl --user --failed`.
+# months is worse than none.
 set -uo pipefail
 
 Z="$HOME/.zprezto"
+BASEFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zprezto-runcoms-base"
+RUNCOMS=(zshrc zpreztorc zprofile zshenv zlogin zlogout)
 [ -d "$Z/.git" ] || exit 0
 
-fail() {
-  echo "$1"
-  command -v notify-send >/dev/null 2>&1 && \
-    notify-send -u critical -a "zprezto" "zprezto update failed" "$1"
-  exit 1
-}
+note() { command -v notify-send >/dev/null 2>&1 && notify-send -u "$1" -a zprezto "$2" "$3"; echo "$3"; }
+fail() { note critical "zprezto update failed" "$1"; exit 1; }
 
-# A dirty tree means someone is editing files inside the upstream checkout,
-# which is exactly the state that makes --ff-only impossible. Say so.
 if [ -n "$(git -C "$Z" status --porcelain --untracked-files=no)" ]; then
-  fail "$Z has uncommitted changes, so pull --ff-only cannot run. Your own config belongs in ~/.zshrc etc, not in the checkout."
+  fail "$Z has uncommitted changes; pull --ff-only cannot run. Local config belongs in ~/.zshrc, not in the checkout."
 fi
 
 git -C "$Z" fetch --quiet origin || fail "could not reach the zprezto remote"
-
-before=$(git -C "$Z" rev-parse --short HEAD)
+before=$(git -C "$Z" rev-parse HEAD)
 git -C "$Z" pull --ff-only --quiet || fail "pull --ff-only failed; the checkout has diverged from upstream"
 git -C "$Z" submodule update --init --recursive --quiet || fail "submodule update failed"
-after=$(git -C "$Z" rev-parse --short HEAD)
+after=$(git -C "$Z" rev-parse HEAD)
 
-if [ "$before" = "$after" ]; then
-  echo "zprezto already current at $after"
-  exit 0
-fi
-echo "zprezto updated $before -> $after"
+mkdir -p "$(dirname "$BASEFILE")"
+base=$(cat "$BASEFILE" 2>/dev/null || echo "$before")
+[ "$before" = "$after" ] && [ "$base" = "$after" ] && { echo "zprezto already current at ${after:0:7}"; exit 0; }
+echo "zprezto ${before:0:7} -> ${after:0:7} (merge base ${base:0:7})"
 
-# Modules update themselves: they are upstream code under ~/.zprezto/modules.
-# The runcoms are only starter templates and are deliberately NOT copied over
-# ~/.zshrc, which holds local config. The cost of that is never hearing about a
-# new module or option upstream added, so report when the templates move and
-# leave the decision to the user.
-changed=$(git -C "$Z" diff --name-only "$before..$after" -- runcoms/ | sed 's|runcoms/||' | paste -sd' ')
-if [ -n "$changed" ]; then
-  msg="Upstream changed: $changed. Your ~/.z* files are untouched. Review with: git -C ~/.zprezto log -p $before..$after -- runcoms/"
-  echo "$msg"
-  command -v notify-send >/dev/null 2>&1 && \
-    notify-send -u normal -a "zprezto" "zprezto templates changed" "$msg"
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+merged=() conflicted=() unchanged=0
+
+for f in "${RUNCOMS[@]}"; do
+  target="$HOME/.$f"
+  [ -f "$target" ] || continue
+  git -C "$Z" show "$base:runcoms/$f" > "$tmp/base" 2>/dev/null || continue
+  git -C "$Z" show "$after:runcoms/$f" > "$tmp/new"  2>/dev/null || continue
+  cmp -s "$tmp/base" "$tmp/new" && { unchanged=$((unchanged+1)); continue; }
+
+  cp "$target" "$tmp/mine"
+  if git merge-file -q -L "yours" -L "prezto($base)" -L "prezto($after)" \
+       "$tmp/mine" "$tmp/base" "$tmp/new" 2>/dev/null; then
+    cp "$tmp/mine" "$target"; merged+=("$f")
+  else
+    conflicted+=("$f")     # target deliberately untouched
+  fi
+done
+
+if [ ${#merged[@]} -gt 0 ]; then
+  note normal "zprezto: upstream changes merged" "Merged into ~/.${merged[*]/#/ ~/.}. Review with: chezmoi diff"
+  command -v chezmoi >/dev/null 2>&1 && chezmoi re-add >/dev/null 2>&1
 fi
 
-newmods=$(git -C "$Z" diff --name-only --diff-filter=A "$before..$after" -- modules/ \
-  | cut -d/ -f2 | sort -u | while read -r m; do
-      grep -q "'$m'" "$HOME/.zpreztorc" 2>/dev/null || echo "$m"
-    done | paste -sd' ')
-if [ -n "$newmods" ]; then
-  msg="New modules available and not in your .zpreztorc: $newmods"
-  echo "$msg"
-  command -v notify-send >/dev/null 2>&1 && \
-    notify-send -u normal -a "zprezto" "New zprezto modules" "$msg"
+if [ ${#conflicted[@]} -gt 0 ]; then
+  # Base is NOT advanced, so this merge is retried next week once resolved.
+  note critical "zprezto: merge conflict" \
+    "Upstream changed ${conflicted[*]} in ways that clash with your edits. Your files are untouched. Diff with: git -C ~/.zprezto diff $base..$after -- runcoms/"
+  exit 1
 fi
+
+printf '%s\n' "$after" > "$BASEFILE"
+echo "merged: ${#merged[@]}  unchanged: $unchanged  base advanced to ${after:0:7}"
