@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+# Nightly dotfile snapshot. Commits every managed file that changed and tries to
+# push.
+#
+# The push is best-effort on purpose: the GitHub key is passphrase-protected, so
+# a push only succeeds when the agent happens to hold it. A failed push leaves
+# the commit locally and the next successful push carries everything, so nothing
+# is ever lost by not being able to authenticate.
+set -uo pipefail
+
+BREW=/home/linuxbrew/.linuxbrew/bin
+[ -x "$BREW/chezmoi" ] || exit 0
+export PATH="$BREW:$PATH"
+
+chezmoi source-path >/dev/null 2>&1 || exit 0
+
+chezmoi re-add || exit 0
+chezmoi git -- diff --quiet HEAD 2>/dev/null && { echo "no dotfile changes"; exit 0; }
+
+chezmoi git -- add -A
+chezmoi git -- commit -m "nightly snapshot $(date +%F)" || exit 0
+echo "committed"
+
+if chezmoi git -- push 2>/dev/null; then
+  echo "pushed"
+else
+  echo "push failed (ssh key likely not in the agent); commit kept, will go with the next push"
+fi

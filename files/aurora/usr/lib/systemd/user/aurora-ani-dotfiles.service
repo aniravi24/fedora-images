@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot dotfiles to the private chezmoi repo
+ConditionPathExists=/usr/libexec/aurora-ani-dotfiles
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-dotfiles
+TimeoutStartSec=5m
