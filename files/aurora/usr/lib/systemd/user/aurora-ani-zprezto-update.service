@@ -1,0 +1,8 @@
+[Unit]
+Description=Update zprezto
+ConditionPathExists=/usr/libexec/aurora-ani-zprezto-update
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-zprezto-update
+TimeoutStartSec=5m

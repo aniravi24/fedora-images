@@ -1,0 +1,61 @@
+#!/usr/bin/bash
+# Weekly zprezto update. This is what the `zprezto-update` zsh function does,
+# written out so systemd can run it without an interactive shell.
+#
+# Deliberately noisy on failure: a silent auto-updater that has been broken for
+# months is worse than no auto-updater. Anything unexpected raises a desktop
+# notification AND exits non-zero so the unit shows in `systemctl --user --failed`.
+set -uo pipefail
+
+Z="$HOME/.zprezto"
+[ -d "$Z/.git" ] || exit 0
+
+fail() {
+  echo "$1"
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -u critical -a "zprezto" "zprezto update failed" "$1"
+  exit 1
+}
+
+# A dirty tree means someone is editing files inside the upstream checkout,
+# which is exactly the state that makes --ff-only impossible. Say so.
+if [ -n "$(git -C "$Z" status --porcelain --untracked-files=no)" ]; then
+  fail "$Z has uncommitted changes, so pull --ff-only cannot run. Your own config belongs in ~/.zshrc etc, not in the checkout."
+fi
+
+git -C "$Z" fetch --quiet origin || fail "could not reach the zprezto remote"
+
+before=$(git -C "$Z" rev-parse --short HEAD)
+git -C "$Z" pull --ff-only --quiet || fail "pull --ff-only failed; the checkout has diverged from upstream"
+git -C "$Z" submodule update --init --recursive --quiet || fail "submodule update failed"
+after=$(git -C "$Z" rev-parse --short HEAD)
+
+if [ "$before" = "$after" ]; then
+  echo "zprezto already current at $after"
+  exit 0
+fi
+echo "zprezto updated $before -> $after"
+
+# Modules update themselves: they are upstream code under ~/.zprezto/modules.
+# The runcoms are only starter templates and are deliberately NOT copied over
+# ~/.zshrc, which holds local config. The cost of that is never hearing about a
+# new module or option upstream added, so report when the templates move and
+# leave the decision to the user.
+changed=$(git -C "$Z" diff --name-only "$before..$after" -- runcoms/ | sed 's|runcoms/||' | paste -sd' ')
+if [ -n "$changed" ]; then
+  msg="Upstream changed: $changed. Your ~/.z* files are untouched. Review with: git -C ~/.zprezto log -p $before..$after -- runcoms/"
+  echo "$msg"
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -u normal -a "zprezto" "zprezto templates changed" "$msg"
+fi
+
+newmods=$(git -C "$Z" diff --name-only --diff-filter=A "$before..$after" -- modules/ \
+  | cut -d/ -f2 | sort -u | while read -r m; do
+      grep -q "'$m'" "$HOME/.zpreztorc" 2>/dev/null || echo "$m"
+    done | paste -sd' ')
+if [ -n "$newmods" ]; then
+  msg="New modules available and not in your .zpreztorc: $newmods"
+  echo "$msg"
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -u normal -a "zprezto" "New zprezto modules" "$msg"
+fi

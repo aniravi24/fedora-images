@@ -140,6 +140,7 @@ modules:
         - syncthing.service
         - aurora-ani-brew.service
         - aurora-ani-dotfiles.timer
+        - aurora-ani-zprezto-update.timer
 
   # Requires cosign.pub at the repo root and SIGNING_SECRET as a repo secret.
   - type: signing
