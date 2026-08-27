@@ -20,6 +20,12 @@ modules:
         - ponesicek/ghostty-bin
     install:
       packages:
+        # Offline speech-to-text (github.com/cjpais/Handy). Not on Flathub and
+        # not in any Fedora repo, so the release RPM is pinned by URL. Bump the
+        # version here when upgrading; Renovate can track the GitHub release.
+        - https://github.com/cjpais/Handy/releases/download/v0.9.6/Handy-0.9.6-1.x86_64.rpm
+        # Wayland text injection, required by Handy to type into the focused app.
+        - wtype
         - ghostty
         - syncthing
         - gvfs-mtp

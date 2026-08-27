@@ -16,3 +16,13 @@ brew "procs"
 brew "croc"
 brew "doggo"
 brew "watchman"
+
+# Taken from Aurora's own cli.Brewfile (`ujust aurora-cli`). Only the pieces
+# that do not fight the existing shell: aurora-cli also installs starship and
+# atuin and runs `ublue-bling`, which appends to .zshrc and would collide with
+# zprezto + powerlevel10k.
+brew "gh"
+brew "ripgrep"
+brew "yq"
+brew "trash-cli"
+brew "tealdeer"
