@@ -33,4 +33,37 @@ for d in /var/home/*/.local/share/mise/installs/node/*/bin; do
   restorecon -R "$d" 2>/dev/null && echo "relabelled $d"
 done
 [ "$found" = 0 ] && echo "no mise node installs to relabel"
+
+# Relabelling at boot is not enough. mise creates a new directory on every node
+# upgrade and those files are born data_home_t, so a mid-session upgrade breaks
+# any system service pointing at node until something relabels it. Waiting for
+# the next boot, or for a poll interval, is a trap: the breakage appears hours
+# later with no visible link to the upgrade that caused it.
+#
+# So watch the directory instead and relabel the moment it changes. systemd path
+# units cannot glob, and the path is per-user, so write one unit per user that
+# actually has a mise node install.
+for nodedir in /var/home/*/.local/share/mise/installs/node; do
+  user=$(basename "$(dirname "$(dirname "$(dirname "$(dirname "$nodedir")")")")")
+  unit="aurora-ani-mise-selinux-${user}.path"
+  path="/etc/systemd/system/${unit}"
+  want="[Unit]
+Description=Watch ${user}'s mise node installs for new versions
+ConditionSecurity=selinux
+
+[Path]
+PathChanged=${nodedir}
+Unit=aurora-ani-mise-selinux.service
+
+[Install]
+WantedBy=multi-user.target
+"
+  if [ ! -f "$path" ] || [ "$(cat "$path")" != "$want" ]; then
+    printf '%s' "$want" > "$path"
+    systemctl daemon-reload
+    echo "wrote $unit"
+  fi
+  systemctl is-enabled "$unit" >/dev/null 2>&1 || systemctl enable --now "$unit" >/dev/null 2>&1 \
+    && echo "watching ${nodedir}"
+done
 exit 0
