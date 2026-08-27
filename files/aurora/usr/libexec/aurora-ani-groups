@@ -1,10 +1,12 @@
 #!/usr/bin/bash
-# Adds admin users to the developer groups. Iterates members of `wheel`
+# Configures admin users: developer groups, and zsh as the login shell. Iterates members of `wheel`
 # rather than assuming uid 1000, since the image is built before users exist.
 set -uo pipefail
 
 WHEEL=$(getent group wheel | cut -d: -f4 | tr ',' ' ')
 [ -n "${WHEEL// }" ] || { echo "no wheel members yet, retrying next boot"; exit 0; }
+
+ZSH=/usr/bin/zsh
 
 for user in $WHEEL; do
   for g in docker incus-admin libvirt lxd kvm adbusers dialout; do
@@ -13,4 +15,11 @@ for user in $WHEEL; do
       usermod -aG "$g" "$user" && echo "added $user to $g"
     fi
   done
+
+  # The installer always creates the user with bash. The zsh config does the
+  # real work here (zprezto, powerlevel10k, `mise activate zsh`), so a bash
+  # login silently has no mise shims and every project tool looks missing.
+  if [ -x "$ZSH" ] && [ "$(getent passwd "$user" | cut -d: -f7)" != "$ZSH" ]; then
+    usermod -s "$ZSH" "$user" && echo "set $user login shell to $ZSH"
+  fi
 done

@@ -1,5 +1,5 @@
 [Unit]
-Description=Add primary user to developer groups
+Description=Configure developer groups and login shell
 After=systemd-user-sessions.service
 ConditionPathExists=/usr/libexec/aurora-ani-groups
 

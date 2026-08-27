@@ -20,10 +20,6 @@ modules:
         - ponesicek/ghostty-bin
     install:
       packages:
-        # Offline speech-to-text (github.com/cjpais/Handy). Not on Flathub and
-        # not in any Fedora repo, so the release RPM is pinned by URL. Bump the
-        # version here when upgrading; Renovate can track the GitHub release.
-        - https://github.com/cjpais/Handy/releases/download/v0.9.6/Handy-0.9.6-1.x86_64.rpm
         # Wayland text injection, required by Handy to type into the focused app.
         - wtype
         - ghostty
@@ -38,6 +34,20 @@ modules:
         - fira-code-fonts
         - adobe-source-code-pro-fonts
         - dejavu-fonts-all
+
+  # Handy (github.com/cjpais/Handy), offline speech-to-text. Not on Flathub and
+  # not in any Fedora repo. The release asset name embeds the version, so
+  # /releases/latest/download/ cannot address it and a pinned URL would need
+  # bumping by hand. Resolve the latest release at build time instead: CI
+  # rebuilds weekly, so the image tracks upstream with nothing to maintain.
+  - type: script
+    snippets:
+      - |
+        set -euo pipefail
+        url=$(curl -fsSL https://api.github.com/repos/cjpais/Handy/releases/latest \
+          | jq -er '.assets[] | select(.name | endswith("x86_64.rpm")) | .browser_download_url')
+        echo "installing Handy from $url"
+        dnf install -y "$url"
 
   # Nerd Font glyphs for the shell prompt, eza, lazygit. Not packaged by
   # Fedora; this module refetches the latest on every image build.
