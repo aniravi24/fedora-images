@@ -18,10 +18,20 @@ modules:
     repos:
       copr:
         - ponesicek/ghostty-bin
+    remove:
+      packages:
+        # Earlier images shipped this for Handy; it cannot work on KWin and
+        # Handy picks it in preference to ydotool, so it must not be present.
+        - wtype
     install:
       packages:
-        # Wayland text injection, required by Handy to type into the focused app.
-        - wtype
+        # Text injection for Handy. NOT wtype: it needs the compositor to
+        # implement zwp_virtual_keyboard_manager_v1, which KWin does not, so it
+        # exits with "Compositor does not support the virtual keyboard protocol"
+        # on Plasma. Worse, Handy prefers wtype when it is present, so having it
+        # installed actively breaks dictation. ydotool goes through /dev/uinput
+        # at the kernel level instead and works on any compositor.
+        - ydotool
         - ghostty
         - syncthing
         - gvfs-mtp
@@ -141,6 +151,7 @@ modules:
         - ssh-agent.socket
         - syncthing.service
         - aurora-ani-brew.service
+        - ydotoold.service
         - aurora-ani-dotfiles.timer
         - aurora-ani-zprezto-update.timer
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=ydotool daemon (user session)
+Documentation=man:ydotoold(8)
+ConditionPathExists=/usr/bin/ydotoold
+
+[Service]
+Type=simple
+# Runs as the user, not root, so the socket belongs to the session and Handy can
+# reach it. Requires membership of `input` for /dev/uinput.
+ExecStart=/usr/bin/ydotoold --socket-path=%t/.ydotool_socket --socket-own=%U:%G
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

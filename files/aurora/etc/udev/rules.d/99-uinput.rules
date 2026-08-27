@@ -1,0 +1,5 @@
+# Let members of `input` use /dev/uinput. It is root:root 0660 by default, so
+# ydotoold would need to run as root, and then its socket is unreachable by the
+# desktop session. static_node applies the mode even before the device is first
+# opened.
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
