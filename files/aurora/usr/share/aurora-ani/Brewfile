@@ -24,6 +24,11 @@ brew "watchman"
 # SQLite-backed shell history: fuzzy Ctrl-R, records exit code, duration, cwd
 # and host per command. Rebinds Ctrl-R and up-arrow only, so it coexists with
 # powerlevel10k. Import the existing history once with `atuin import auto`.
+# Installed but NOT activated: the prompt stays powerlevel10k until .zshrc
+# says otherwise. Starship has no native jj support yet (starship#6969, #7224
+# are still open) and no instant-prompt equivalent, so this is here to A/B
+# against p10k, not to replace it.
+brew "starship"
 brew "atuin"
 brew "gh"
 brew "ripgrep"
