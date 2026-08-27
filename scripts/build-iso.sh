@@ -7,7 +7,10 @@
 #
 # Root throughout: bootc-image-builder refuses to run rootless.
 set -euo pipefail
-cd "$(dirname "$0")"
+# The repo root, not the script's own directory: output/ and any relative
+# paths belong beside recipes/ and files/, and this script now lives in
+# scripts/.
+cd "$(dirname "$0")/.."
 
 [ "$(id -u)" = 0 ] || { echo "must run as root (sudo $0 $*)" >&2; exit 1; }
 
