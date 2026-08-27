@@ -25,6 +25,8 @@ modules:
       packages:
         - tailscale
         - audit
+        # semanage, for the mise/node SELinux relabel. IoT ships bare.
+        - policycoreutils-python-utils
         - firewalld
         - git
         - unzip
@@ -66,6 +68,11 @@ modules:
     system:
       enabled:
         - console-powerdown.service
+        # portless installs a system unit whose ExecStart is node under
+        # ~/.local/share/mise. init_t may not execute data_home_t, so it
+        # dies with 203/EXEC and installdeps.sh reinstalls it, with sudo,
+        # on every run.
+        - aurora-ani-mise-selinux.service
         - avahi-daemon.service
         - sshd.service
         - tailscaled.service
