@@ -1,0 +1,16 @@
+#!/usr/bin/bash
+# Adds admin users to the developer groups. Iterates members of `wheel`
+# rather than assuming uid 1000, since the image is built before users exist.
+set -uo pipefail
+
+WHEEL=$(getent group wheel | cut -d: -f4 | tr ',' ' ')
+[ -n "${WHEEL// }" ] || { echo "no wheel members yet, retrying next boot"; exit 0; }
+
+for user in $WHEEL; do
+  for g in docker incus-admin libvirt lxd kvm adbusers dialout; do
+    getent group "$g" >/dev/null 2>&1 || continue
+    if ! id -nG "$user" 2>/dev/null | tr ' ' '\n' | grep -qx "$g"; then
+      usermod -aG "$g" "$user" && echo "added $user to $g"
+    fi
+  done
+done

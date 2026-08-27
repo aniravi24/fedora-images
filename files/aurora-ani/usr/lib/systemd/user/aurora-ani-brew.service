@@ -1,0 +1,11 @@
+[Unit]
+Description=Install declared Homebrew packages
+ConditionPathExists=/usr/libexec/aurora-ani-brew
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-brew
+TimeoutStartSec=1h
+
+[Install]
+WantedBy=default.target

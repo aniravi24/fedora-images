@@ -1,0 +1,19 @@
+# Nothing blanks the console on a headless box: consoleblank defaults to 0, so
+# the login prompt stays lit forever, burning the panel and drawing power. The
+# value is SECONDS; any keypress restores it, so the local console still works.
+#
+# systemd.show_status=no rides along because systemd writes job status lines to
+# /dev/console and any console write unblanks the panel, which would otherwise
+# wake the screen on a timer forever.
+#
+# On ostree these cannot come from /etc/default/grub: kernel arguments live in
+# BLS entries, and a kargs.d drop-in ships them in the image so they survive
+# updates instead of being re-applied per boot by a script.
+# loglevel=3 keeps kernel chatter off the panel. systemd.show_status=no only
+# silences systemd's own status lines; kernel printk is separate, and SELinux
+# audit records arrive at KERN_NOTICE. With the default console loglevel of 7
+# every ssh login and sudo paints the screen with audit lines. auditd (shipped
+# in this image) consumes those records into /var/log/audit instead, and this
+# is the belt to that braces: any other chatty subsystem stays off the console.
+kargs = ["consoleblank=300", "systemd.show_status=no", "loglevel=3"]
+match-architectures = ["x86_64"]

@@ -1,0 +1,78 @@
+---
+# yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
+name: iot-devbox
+description: Fedora IoT with the packages a development box needs.
+
+base-image: quay.io/fedora/fedora-iot
+image-version: latest
+
+modules:
+  # Only /etc and /usr: ostree symlinks the rest to /var.
+  - type: files
+    files:
+      - source: iot-devbox
+        destination: /
+
+  # IoT ships bare. podman, NetworkManager-wifi, wpa_supplicant and the
+  # wireless firmware are already there; everything below is not.
+  - type: dnf
+    repos:
+      # Fedora ships 1.98.8; upstream tracks current. Tailscale is how this box
+      # is reached at all, so it is not optional.
+      files:
+        - https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+    install:
+      packages:
+        - tailscale
+        - audit
+        - firewalld
+        - git
+        - unzip
+        - gcc
+        - gcc-c++
+        - make
+        - avahi
+        - nss-mdns
+        - mosh
+        - openssh-server
+        - rsync
+        - jq
+        - tar
+        - zstd
+        - bubblewrap
+        - distrobox
+        - moby-engine
+        - docker-compose
+        # chromium runtime libs: playwright's --with-deps only knows apt
+        - alsa-lib
+        - at-spi2-atk
+        - atk
+        - cups-libs
+        - libdrm
+        - libX11
+        - libXcomposite
+        - libXdamage
+        - libXext
+        - libXfixes
+        - libXrandr
+        - libxkbcommon
+        - mesa-libgbm
+        - nspr
+        - nss
+        - pango
+        - cairo
+
+  - type: systemd
+    system:
+      enabled:
+        - console-powerdown.service
+        - avahi-daemon.service
+        - sshd.service
+        - tailscaled.service
+        - auditd.service
+        - firewalld.service
+        - docker.service
+        # greenboot rolls a failed update back on its own
+        - bootc-fetch-apply-updates.timer
+
+  - type: signing

@@ -1,0 +1,83 @@
+#!/bin/sh
+# Turn the panel backlight off when the console goes idle, and back on at the
+# first keypress. Console blanking (consoleblank=) only stops drawing; on
+# DRM/KMS it does not cut the backlight, so without this the panel sits lit and
+# black on a machine nobody looks at.
+#
+# Idle is measured from the atime of the active tty, which the kernel updates
+# whenever the console is read - the same signal systemd-logind uses for a tty
+# session's IdleHint. The obvious alternative, mirroring
+# /sys/class/graphics/fb0/blank, cannot work on Fedora: the kernel is built
+# with CONFIG_DRM_FBDEV_EMULATION=y but without CONFIG_FB_DEVICE, so fbcon
+# renders the console while no fb0 is exposed to userspace at all.
+set -u
+
+IDLE_AFTER=${IDLE_AFTER:-300}   # seconds; match consoleblank= so both fire together
+POLL=${POLL:-10}
+
+find_backlight() {
+  for cand in intel_backlight amdgpu_bl0 amdgpu_bl1 nv_backlight; do
+    [ -d "/sys/class/backlight/$cand" ] && { echo "/sys/class/backlight/$cand/"; return 0; }
+  done
+  # acpi_video is excluded deliberately: on hybrid laptops it exists alongside
+  # the real device and writing to it does nothing visible.
+  for d in /sys/class/backlight/*/; do
+    case "$d" in *acpi_video*) continue ;; esac
+    [ -d "$d" ] && { echo "$d"; return 0; }
+  done
+  return 1
+}
+
+# The backlight device appears when the GPU driver binds, which can be after
+# this unit starts. Wait rather than exiting, or a fast boot loses the feature
+# for the whole uptime.
+tries=0
+while :; do
+  BL=$(find_backlight) && break
+  tries=$((tries + 1))
+  if [ "$tries" -ge 30 ]; then
+    echo "no backlight device after 60s; nothing to control." >&2
+    exit 0
+  fi
+  sleep 2
+done
+
+# Leave the panel usable if we are stopped, otherwise a restart or a shutdown
+# could strand it dark.
+trap '{ printf "0\n" > "${BL}bl_power"; } 2>/dev/null; exit 0' TERM INT HUP
+
+active_tty() {
+  a=$(cat /sys/class/tty/tty0/active 2>/dev/null) || return 1
+  [ -n "$a" ] && echo "/dev/$a"
+}
+
+last=
+warned=
+while :; do
+  tty=$(active_tty)
+  if [ -z "$tty" ] || [ ! -e "$tty" ]; then
+    [ -z "$warned" ] && { echo "cannot resolve the active tty; pausing." >&2; warned=1; }
+    sleep "$POLL"; continue
+  fi
+  atime=$(stat -c %X "$tty" 2>/dev/null)
+  if [ -z "$atime" ]; then
+    [ -z "$warned" ] && { echo "cannot stat $tty; pausing." >&2; warned=1; }
+    sleep "$POLL"; continue
+  fi
+  warned=
+
+  idle=$(( $(date +%s) - atime ))
+  if [ "$idle" -ge "$IDLE_AFTER" ]; then want=4; else want=0; fi
+
+  # The device can vanish on a GPU rebind; re-resolve rather than write forever
+  # into a path that no longer exists.
+  if [ ! -e "${BL}bl_power" ]; then
+    BL=$(find_backlight) || BL=/nonexistent/
+    last=
+  fi
+
+  if [ "$want" != "$last" ]; then
+    { printf '%s\n' "$want" > "${BL}bl_power"; } 2>/dev/null && last=$want
+  fi
+  sleep "$POLL"
+done

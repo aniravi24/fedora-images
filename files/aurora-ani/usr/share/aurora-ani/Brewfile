@@ -1,0 +1,18 @@
+# Installed on first boot.
+
+brew "eza"
+brew "bat"
+brew "zoxide"
+brew "direnv"
+brew "mise"
+brew "fd"
+brew "libpq"
+brew "k9s"
+brew "lazydocker"
+brew "dive"
+brew "duf"
+brew "dust"
+brew "procs"
+brew "croc"
+brew "doggo"
+brew "watchman"

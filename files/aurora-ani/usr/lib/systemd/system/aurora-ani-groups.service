@@ -1,0 +1,12 @@
+[Unit]
+Description=Add primary user to developer groups
+After=systemd-user-sessions.service
+ConditionPathExists=/usr/libexec/aurora-ani-groups
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-groups
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

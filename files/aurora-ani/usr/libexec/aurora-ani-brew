@@ -1,0 +1,36 @@
+#!/usr/bin/bash
+# Installs the packages declared in /usr/share/aurora-ani/Brewfile.
+# Runs as a user unit: brew requires $HOME and refuses to run as root.
+set -uo pipefail
+
+BREWFILE=/usr/share/aurora-ani/Brewfile
+BREW=/home/linuxbrew/.linuxbrew/bin/brew
+STAMP="${XDG_STATE_HOME:-$HOME/.local/state}/aurora-ani"
+
+[ -f "$BREWFILE" ] || exit 0
+
+# Keyed on content, so an edited Brewfile re-runs and an unchanged one is free.
+WANT=$(sha256sum "$BREWFILE" | cut -d' ' -f1)
+[ "$(cat "$STAMP/brew-bundle" 2>/dev/null)" = "$WANT" ] && exit 0
+
+# brew is unpacked by a system unit at boot; wait rather than race.
+for _ in $(seq 1 36); do
+  [ -x "$BREW" ] && break
+  sleep 5
+done
+[ -x "$BREW" ] || { echo "brew absent after 180s, retrying next login"; exit 0; }
+
+for _ in $(seq 1 30); do
+  curl -fsI --max-time 5 https://formulae.brew.sh >/dev/null 2>&1 && break
+  sleep 5
+done
+
+mkdir -p "$STAMP"
+eval "$("$BREW" shellenv)"
+
+if brew bundle --file="$BREWFILE"; then
+  printf '%s\n' "$WANT" > "$STAMP/brew-bundle"
+  echo "brew bundle complete"
+else
+  echo "brew bundle failed, retrying next login"
+fi

@@ -1,0 +1,11 @@
+cosign.key
+cosign.private
+*.iso
+*.iso-CHECKSUM
+*.qcow2
+*.ppm
+*.png
+*.log
+output/
+.bluebuild-scripts_*
+/.bluebuild-scripts_*

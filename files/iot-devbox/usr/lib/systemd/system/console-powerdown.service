@@ -1,0 +1,16 @@
+[Unit]
+Description=Mirror console blank state onto the panel backlight
+After=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/devbox-console-powerdown
+# on-failure, not always: the helper exits 0 when it gives up after the fb0
+# retry window, and Restart=always would relaunch that every 5s forever.
+Restart=on-failure
+RestartSec=5
+# Exit 1 means the kernel cannot report blank state, which no retry fixes.
+RestartPreventExitStatus=1
+
+[Install]
+WantedBy=multi-user.target
