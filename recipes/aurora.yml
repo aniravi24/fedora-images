@@ -134,6 +134,7 @@ modules:
         - aurora-ani-groups.service
         - aurora-ani-groups.path
         - aurora-ani-mise-selinux.service
+        - aurora-ani-signal-desktop.path
         - docker.service
     user:
       enabled:

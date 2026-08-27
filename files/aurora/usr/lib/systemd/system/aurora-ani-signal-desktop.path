@@ -1,0 +1,12 @@
+[Unit]
+Description=Watch for Signal Flatpak updates
+ConditionPathExists=/var/lib/flatpak/exports/share/applications
+
+[Path]
+# Fires when Signal is installed, updated or removed, so the override tracks
+# upstream instead of freezing at whatever it looked like on the day it was made.
+PathChanged=/var/lib/flatpak/exports/share/applications/org.signal.Signal.desktop
+Unit=aurora-ani-signal-desktop.service
+
+[Install]
+WantedBy=multi-user.target

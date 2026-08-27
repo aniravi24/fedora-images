@@ -1,0 +1,7 @@
+[Unit]
+Description=Regenerate the Signal launcher override from the Flatpak
+ConditionPathExists=/usr/libexec/aurora-ani-signal-desktop
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-signal-desktop

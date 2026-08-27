@@ -21,6 +21,19 @@ chezmoi git -- add -A
 chezmoi git -- commit -m "nightly snapshot $(date +%F)" || exit 0
 echo "committed"
 
+# Integrate the remote first. `chezmoi re-add` only copies home into the source
+# directory; it never talks to git. Without this, a second machine that pushed
+# first makes every push here a non-fast-forward, and commits pile up locally
+# while looking backed up.
+if ! chezmoi git -- pull --rebase --autostash 2>/dev/null; then
+  chezmoi git -- rebase --abort 2>/dev/null
+  msg="Dotfiles rebase onto the remote conflicted. Nothing was lost; resolve with: chezmoi git -- pull --rebase"
+  echo "$msg"
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -u critical -a dotfiles "dotfiles sync conflict" "$msg"
+  exit 1
+fi
+
 if chezmoi git -- push 2>/dev/null; then
   echo "pushed"
 else
