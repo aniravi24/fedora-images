@@ -44,7 +44,11 @@ done
 # units cannot glob, and the path is per-user, so write one unit per user that
 # actually has a mise node install.
 for nodedir in /var/home/*/.local/share/mise/installs/node; do
-  user=$(basename "$(dirname "$(dirname "$(dirname "$(dirname "$nodedir")")")")")
+  # Strip the prefix and take the first component; counting dirname calls up a
+  # fixed-depth path is easy to get wrong by one.
+  user=${nodedir#/var/home/}
+  user=${user%%/*}
+  [ -n "$user" ] || continue
   unit="aurora-ani-mise-selinux-${user}.path"
   path="/etc/systemd/system/${unit}"
   want="[Unit]
