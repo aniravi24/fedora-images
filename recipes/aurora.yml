@@ -132,6 +132,11 @@ modules:
           # system-dx-flatpaks.Brewfile: never offered automatically, because
           # install-system-flatpaks gates them on image-flavor matching "dx" and
           # aurora-dx sets flavor "main".
+          # Manages AppImages: moves them somewhere sane, generates a .desktop
+          # entry, and updates them in place. Needed because Ledger Live is not
+          # on Flathub in any form and ships only an AppImage, and loose
+          # AppImages in ~/bin get no launcher entry and never update.
+          - it.mijorus.gearlever
           - io.podman_desktop.PodmanDesktop
           - io.github.getnf.embellish
           - me.iepure.devtoolbox
