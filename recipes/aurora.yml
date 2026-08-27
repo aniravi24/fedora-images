@@ -133,6 +133,7 @@ modules:
       enabled:
         - aurora-ani-groups.service
         - aurora-ani-groups.path
+        - aurora-ani-mise-selinux.service
         - docker.service
     user:
       enabled:

@@ -1,0 +1,36 @@
+#!/usr/bin/bash
+# Let system services execute mise-managed node.
+#
+# portless installs a SYSTEM systemd unit whose ExecStart is the node binary
+# under ~/.local/share/mise/installs. systemd runs system units as init_t, and
+# Fedora's policy forbids init_t from executing files labelled data_home_t, so
+# the unit dies with 203/EXEC and the proxy never binds 443. The dev script then
+# reinstalls the service on every run, which is why it asks for a sudo password
+# every time.
+#
+# The fcontext rule persists in /etc, but a rule alone does not relabel files
+# that already exist, and mise creates a fresh directory on every node upgrade.
+# So this also runs restorecon each boot, which makes it self-healing.
+#
+# Narrowly scoped to node's bin directory on purpose. Anything writable that
+# carries bin_t can be executed by a system service, so this should cover as
+# little as possible.
+set -uo pipefail
+command -v semanage >/dev/null 2>&1 || exit 0
+command -v restorecon >/dev/null 2>&1 || exit 0
+[ "$(getenforce 2>/dev/null)" = "Disabled" ] && exit 0
+
+PATTERN='/var/home/[^/]+/\.local/share/mise/installs/node/[^/]+/bin(/.*)?'
+
+if ! semanage fcontext -l 2>/dev/null | grep -qF "$PATTERN"; then
+  semanage fcontext -a -t bin_t "$PATTERN" && echo "added fcontext rule for mise node"
+fi
+
+shopt -s nullglob
+found=0
+for d in /var/home/*/.local/share/mise/installs/node/*/bin; do
+  found=1
+  restorecon -R "$d" 2>/dev/null && echo "relabelled $d"
+done
+[ "$found" = 0 ] && echo "no mise node installs to relabel"
+exit 0
