@@ -5,7 +5,7 @@ Custom [Fedora](https://fedoraproject.org) images built with
 
 | Recipe | Base | For |
 | --- | --- | --- |
-| `aurora-ani` | [Aurora](https://getaurora.dev) | desktop |
+| `aurora` | [Aurora](https://getaurora.dev) | desktop |
 | `iot-devbox` | [Fedora IoT](https://fedoraproject.org/iot/) | headless dev box |
 
 Both are signed with the same key and published to

@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
-name: aurora-ani
+name: aurora
 description: Custom Aurora image.
 
 base-image: ghcr.io/ublue-os/aurora-dx
@@ -10,7 +10,7 @@ modules:
   # Only /etc and /usr: rpm-ostree symlinks the rest to /var.
   - type: files
     files:
-      - source: aurora-ani
+      - source: aurora
         destination: /
 
   # ghostty is not in Fedora and has no Flathub build, hence the COPR.

@@ -13,7 +13,7 @@ cd "$(dirname "$0")"
 
 MODE="${1:-vm}"
 OWNER="${SUDO_USER:?run via sudo}"
-IMAGE=ghcr.io/aniravi24/aurora-ani
+IMAGE=ghcr.io/aniravi24/aurora
 BLUEBUILD="/home/$OWNER/.local/bin/bluebuild"
 
 case "$MODE" in
@@ -52,7 +52,7 @@ case "$MODE" in
     # bootc source (quay.io/fedora-ostree-desktops/base:44 rather than ours).
     # That box then has no route to updates, and `bootc upgrade` would replace
     # the customised OS with stock Fedora. Publish first, then build the ISO.
-    REF="${2:-$IMAGE}"; VARIANT="${3:-kinoite}"; NAME="${4:-aurora-ani.iso}"
+    REF="${2:-$IMAGE}"; VARIANT="${3:-kinoite}"; NAME="${4:-aurora.iso}"
     mkdir -p output
     # xorriso refuses to write into an existing non-empty target.
     rm -f "output/$NAME" "output/$NAME-CHECKSUM"
