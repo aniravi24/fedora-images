@@ -32,6 +32,12 @@ modules:
         # installed actively breaks dictation. ydotool goes through /dev/uinput
         # at the kernel level instead and works on any compositor.
         - ydotool
+        # Unlocks KWallet with the login password via PAM. Without it KWallet
+        # prompts separately at login, and ksshaskpass cannot answer ssh-add
+        # until it is unlocked, so an SSH key with a passphrase still prompts.
+        # See ublue-os/bluefin#1154. NOTE: the wallet password must match the
+        # login password for this to work.
+        - kwallet-pam
         - ghostty
         - syncthing
         - gvfs-mtp
