@@ -21,6 +21,10 @@ brew "watchman"
 # that do not fight the existing shell: aurora-cli also installs starship and
 # atuin and runs `ublue-bling`, which appends to .zshrc and would collide with
 # zprezto + powerlevel10k.
+# SQLite-backed shell history: fuzzy Ctrl-R, records exit code, duration, cwd
+# and host per command. Rebinds Ctrl-R and up-arrow only, so it coexists with
+# powerlevel10k. Import the existing history once with `atuin import auto`.
+brew "atuin"
 brew "gh"
 brew "ripgrep"
 brew "yq"
