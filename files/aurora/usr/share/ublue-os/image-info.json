@@ -1,0 +1,9 @@
+{
+  "image-name": "aurora",
+  "image-flavor": "main",
+  "image-vendor": "aniravi24",
+  "image-ref": "ostree-image-signed:docker://ghcr.io/aniravi24/aurora",
+  "image-tag": "latest",
+  "base-image-name": "kinoite",
+  "fedora-version": "44"
+}
