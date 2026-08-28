@@ -30,8 +30,8 @@ brew "watchman"
 # against p10k, not to replace it.
 brew "starship"
 brew "atuin"
-# Dotfiles. See the bootstrap in the repo README: chezmoi needs the age key
-# from Bitwarden before `chezmoi init --apply` can decrypt .zshrc.local.
+# Dotfiles. Bootstrap order is in the repo README; the age key has to be in
+# place before `chezmoi init --apply` can decrypt anything.
 brew "chezmoi"
 brew "age"
 brew "gh"
