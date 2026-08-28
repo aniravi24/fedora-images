@@ -50,7 +50,7 @@ this image. The dotfiles repo is separate and private.
 On a fresh machine, after the first boot:
 
 ```bash
-# 1. age key from Bitwarden, or nothing encrypted can be decrypted
+# 1. age key from your password manager, or nothing encrypted can be decrypted
 mkdir -p ~/.config/chezmoi && $EDITOR ~/.config/chezmoi/key.txt && chmod 600 ~/.config/chezmoi/key.txt
 
 # 2. zprezto first: chezmoi tracks only the runcoms, not the upstream modules
@@ -60,7 +60,6 @@ git clone --recursive https://github.com/sorin-ionescu/prezto.git ~/.zprezto
 chezmoi init --apply git@github.com:aniravi24/dotfiles.git
 ```
 
-Client-specific aliases live in `.zshrc.local`, stored age-encrypted. Credential
-stores (`.ssh`, `.gnupg`, `.aws`, `.kube`, `gh`, Bitwarden, kwallet) and all
-shell histories are excluded from the repo entirely, not encrypted: they are
-regenerated per machine, not reproduced.
+Machine-specific aliases live in `.zshrc.local`, stored age-encrypted. Credential
+stores and shell history are excluded from the repo entirely rather than
+encrypted: they are regenerated per machine, not reproduced.
