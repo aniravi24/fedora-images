@@ -126,6 +126,7 @@ modules:
           - org.videolan.VLC
           - io.mpv.Mpv
           - org.audacityteam.Audacity
+          - com.github.wwmm.easyeffects
           - org.kde.okular
           - org.kde.gwenview
           - com.valvesoftware.Steam
