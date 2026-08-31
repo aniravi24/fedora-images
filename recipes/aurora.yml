@@ -115,6 +115,7 @@ modules:
           - org.inkscape.Inkscape
           - org.blender.Blender
           - org.kde.kdenlive
+          - com.obsproject.Studio
           - com.sejda.Sejda
           - com.calibre_ebook.calibre
           - md.obsidian.Obsidian
