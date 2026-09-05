@@ -34,6 +34,50 @@ for d in /var/home/*/.local/share/mise/installs/node/*/bin; do
 done
 [ "$found" = 0 ] && echo "no mise node installs to relabel"
 
+# Keep portless's hardcoded node path pointing at a node that still exists.
+#
+# portless writes the exact node version into its system unit, in both PATH and
+# ExecStart. mise deletes the old version on upgrade, so the unit is left naming
+# an interpreter that is gone and systemd fails it with 203/EXEC, the same exit
+# code the label problem above produced. Without this the only recourse is
+# re-running portless's installer under sudo, which re-pins a version that the
+# next upgrade breaks again, so the prompt comes back forever.
+#
+# This runs from the same path unit that watches mise's node directory, so the
+# repair lands on the upgrade itself rather than whenever 443 is next needed.
+unit=/etc/systemd/system/portless.service
+if [ -f "$unit" ]; then
+  nodepath=$(grep -m1 '^ExecStart=' "$unit" \
+    | grep -oE '(/var)?/home/[^/]+/\.local/share/mise/installs/node/[^/"]+/bin/node') || nodepath=
+  if [ -n "$nodepath" ] && [ ! -x "$nodepath" ]; then
+    nodedir=${nodepath%/*/bin/node}
+    old=${nodepath#"$nodedir"/}
+    old=${old%/bin/node}
+    # Only real x.y.z installs. mise also keeps alias directories (24, lts,
+    # latest) that follow whatever is current, and pinning the unit to one of
+    # those would swap the interpreter under portless on some later upgrade
+    # without anything here running to notice.
+    new=$(for d in "$nodedir"/*/bin/node; do
+            v=${d#"$nodedir"/}
+            v=${v%/bin/node}
+            case "$v" in
+              [0-9]*.[0-9]*.[0-9]*) [ -x "$d" ] && echo "$v" ;;
+            esac
+          done | sort -V | tail -1)
+    if [ -n "$new" ] && [ "$new" != "$old" ]; then
+      # Escape the dots so the old version cannot match a neighbouring path.
+      old_re=$(printf '%s' "$old" | sed 's/\./\\./g')
+      sed -i "s|/installs/node/${old_re}/|/installs/node/${new}/|g" "$unit"
+      systemctl daemon-reload
+      echo "portless: node $old is gone, repointed to $new"
+      if systemctl is-enabled portless.service >/dev/null 2>&1; then
+        systemctl reset-failed portless.service >/dev/null 2>&1
+        systemctl restart portless.service && echo "portless: restarted"
+      fi
+    fi
+  fi
+fi
+
 # Relabelling at boot is not enough. mise creates a new directory on every node
 # upgrade and those files are born data_home_t, so a mid-session upgrade breaks
 # any system service pointing at node until something relabels it. Waiting for
