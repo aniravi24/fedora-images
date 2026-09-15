@@ -1,0 +1,16 @@
+[Unit]
+Description=Nightly dotfile pull
+
+[Timer]
+# 03:30 Eastern, naming the zone for the same reason wallabag-maintain does:
+# the box runs UTC, the human does not, and this should not drift by an hour
+# across DST. Placed after the laptop's own snapshot push (just after midnight
+# Eastern) so the commit is already on the remote, after wallabag-maintain at
+# 03:00, and before bootc-fetch-apply-updates at 04:00, which may reboot.
+OnCalendar=*-*-* 03:30:00 America/New_York
+# The devbox is not always awake at 03:30; catch up on the next boot.
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

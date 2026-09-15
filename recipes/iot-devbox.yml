@@ -139,5 +139,11 @@ modules:
         - docker.service
         # greenboot rolls a failed update back on its own
         - bootc-fetch-apply-updates.timer
+    user:
+      enabled:
+        # Pull-only. The laptop's aurora-ani-dotfiles.timer is the writer; this
+        # box just consumes what it pushes. Relies on Linger=yes for the user
+        # manager to exist on a headless box with nobody logged in.
+        - devbox-dotfiles-pull.timer
 
   - type: signing

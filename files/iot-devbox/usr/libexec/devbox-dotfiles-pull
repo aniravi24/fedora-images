@@ -1,0 +1,94 @@
+#!/usr/bin/bash
+# Nightly dotfile pull. This box is a consumer only.
+#
+# The laptop is the sole writer: aurora-ani-dotfiles.timer there snapshots home
+# with `chezmoi re-add`, commits and pushes to the private repo. This script
+# only ever reads that history. It deliberately never re-adds and never
+# commits: with two machines snapshotting the same tracked file, whichever ran
+# last wins, so this box's older copy of a shared file would be pushed over the
+# laptop's newer one.
+#
+# Deliberately unlike the aurora script, which guards on
+# /home/linuxbrew/.linuxbrew/bin/chezmoi and exits 0 otherwise. There is no
+# Homebrew on this image -- chezmoi is the Fedora package installed by the same
+# recipe that enables this timer -- so that guard would make the unit a silent
+# no-op, which is indistinguishable from syncing correctly.
+set -uo pipefail
+
+chezmoi=$(command -v chezmoi || echo /usr/bin/chezmoi)
+if [ ! -x "$chezmoi" ]; then
+  echo "chezmoi is not installed; nothing to pull"
+  exit 0
+fi
+
+# An uninitialised box is not a 3am problem to solve: `chezmoi init` needs the
+# age identity, which is placed by hand. Say what to run and stop.
+source_dir=$("$chezmoi" source-path 2>/dev/null) || source_dir=""
+if [ -z "$source_dir" ] || [ ! -d "$source_dir/.git" ]; then
+  echo "no chezmoi git source at ${source_dir:-<none>}; run:"
+  echo "  chezmoi init --apply git@github.com:aniravi24/dotfiles.git"
+  exit 0
+fi
+
+# Persistent=true means a missed run fires shortly after boot, which can be
+# before the network is usable. There is no network-online.target in the user
+# instance to order against (LoadState=not-found), so wait here instead, and
+# treat a still-unreachable remote as a clean skip: the timer fires again
+# tomorrow and nothing needs fixing.
+for _ in $(seq 12); do
+  getent hosts github.com >/dev/null 2>&1 && break
+  sleep 5
+done
+if ! getent hosts github.com >/dev/null 2>&1; then
+  echo "github.com does not resolve yet; skipping this run"
+  exit 0
+fi
+
+if ! "$chezmoi" git -- fetch --quiet origin; then
+  echo "could not fetch the dotfiles remote; skipping this run"
+  exit 0
+fi
+
+# `git pull --ff-only` is not sufficient on its own: when this box is merely
+# ahead of the remote it reports "Already up to date" and exits 0, so a stray
+# local commit would be applied as if it came from the laptop. Check for local
+# work explicitly instead.
+#
+# Either condition means something here started writing to the source
+# directory, which contradicts the consumer-only design. Fail loudly rather
+# than absorbing it: this box must never be the origin of a dotfile change.
+ahead=$("$chezmoi" git -- rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)
+dirty=$("$chezmoi" git -- status --porcelain 2>/dev/null)
+if [ "${ahead:-0}" -gt 0 ] || [ -n "$dirty" ]; then
+  echo "this box has local dotfile work, so nothing was pulled:"
+  [ "${ahead:-0}" -gt 0 ] && echo "  $ahead commit(s) not on the remote"
+  [ -n "$dirty" ] && printf '  uncommitted source changes:\n%s\n' "$dirty"
+  echo "the laptop is the only writer; discard with:"
+  echo "  chezmoi git -- reset --hard @{u}"
+  exit 1
+fi
+
+# Now a fast-forward is the only possible outcome.
+if ! "$chezmoi" git -- merge --ff-only '@{u}'; then
+  echo "fast-forward onto the remote failed; inspect with: chezmoi git -- status"
+  exit 1
+fi
+
+# Whatever is listed here is a local edit that apply is about to replace with
+# the repo's copy. For a consumer box that is the intended outcome, but it
+# belongs in the journal rather than disappearing without trace.
+drift=$("$chezmoi" status 2>/dev/null)
+if [ -n "$drift" ]; then
+  printf 'replacing local edits with the repo copy:\n%s\n' "$drift"
+fi
+
+# Failure is left visible: the unit goes to failed, rather than reporting
+# success on a half-applied home. The usual cause is a missing age identity, so
+# the encrypted entries cannot be decrypted.
+if ! "$chezmoi" apply; then
+  echo "chezmoi apply failed; home may be partially applied."
+  echo "if the age identity is missing, restore ~/.config/chezmoi/key.txt"
+  exit 1
+fi
+
+echo "applied $("$chezmoi" git -- rev-parse --short HEAD)"

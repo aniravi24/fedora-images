@@ -1,0 +1,8 @@
+[Unit]
+Description=Pull dotfiles from the private chezmoi repo
+ConditionPathExists=/usr/libexec/devbox-dotfiles-pull
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/devbox-dotfiles-pull
+TimeoutStartSec=5m
