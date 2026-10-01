@@ -1,0 +1,84 @@
+#!/usr/bin/bash
+# Daily omp update: the binary, the bun it installs plugins with, and every
+# installed plugin.
+#
+# omp has no auto-update of its own. `omp update` replaces the binary at
+# ~/.local/bin/omp (verified download, atomic swap). Running sessions keep the
+# old binary until they restart; the omp-autoupdate plugin, if installed,
+# restarts idle sessions into the new one. Its own scheduler is not used: this
+# unit is the only updater.
+#
+# Plugins need two passes. A bare `omp plugin upgrade` covers marketplace
+# plugins only, so npm and git plugins (context-mode, omp-autoupdate) are read
+# from the plugin manifest and upgraded one by one. Local links and file:
+# specs have nothing to upgrade and are skipped.
+#
+# Plugin upgrades shell out to `bun install`, and bun comes from mise. The
+# global mise config (chezmoi) sets bun = "latest"; without a global bun the
+# shim errors in any directory without a mise.toml and every plugin upgrade
+# fails. bun is upgraded first so plugins install with the current one.
+#
+# Every step runs even if an earlier one failed, then the unit fails with one
+# notification listing what broke. Deliberately noisy: a silent auto-updater
+# that has been broken for months is worse than none.
+set -uo pipefail
+
+OMP="$HOME/.local/bin/omp"
+PLUGINS="$HOME/.omp/plugins/package.json"
+[ -x "$OMP" ] || { echo "omp is not installed at $OMP; nothing to update"; exit 0; }
+
+note() { command -v notify-send >/dev/null 2>&1 && notify-send -u "$1" -a omp "$2" "$3"; echo "$3"; }
+
+# mise is Homebrew's on aurora and a standalone binary on the devbox.
+mise=""
+for m in /home/linuxbrew/.linuxbrew/bin/mise "$HOME/.local/bin/mise"; do
+  [ -x "$m" ] && { mise=$m; break; }
+done
+export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
+
+# Unauthenticated GitHub release metadata is limited to 60 requests an hour.
+if [ -z "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
+  if token=$(gh auth token 2>/dev/null) && [ -n "$token" ]; then
+    export GH_TOKEN="$token"
+  fi
+fi
+
+# Persistent=true fires a missed run right after boot, possibly before the
+# network is up, and the user instance has no network-online.target. Wait, and
+# treat a still-unreachable GitHub as a clean skip: the timer fires tomorrow.
+for _ in $(seq 12); do
+  getent hosts github.com >/dev/null 2>&1 && break
+  sleep 5
+done
+if ! getent hosts github.com >/dev/null 2>&1; then
+  echo "github.com does not resolve yet; skipping this run"
+  exit 0
+fi
+
+failed=()
+
+before=$("$OMP" --version 2>/dev/null)
+"$OMP" update </dev/null || failed+=("omp update")
+after=$("$OMP" --version 2>/dev/null)
+[ "$before" != "$after" ] && note normal "omp updated" "$before -> $after. Running sessions pick it up on restart."
+
+if [ -n "$mise" ]; then
+  "$mise" upgrade bun || failed+=("mise upgrade bun")
+else
+  failed+=("mise not found, so bun cannot be upgraded")
+fi
+
+if [ -f "$PLUGINS" ]; then
+  mapfile -t plugins < <(/usr/bin/jq -r '.dependencies // {} | to_entries[]
+    | select(.value | test("^(file|link|workspace|portal):") | not) | .key' "$PLUGINS")
+  for p in "${plugins[@]}"; do
+    "$OMP" plugin upgrade "$p" </dev/null || failed+=("plugin $p")
+  done
+fi
+"$OMP" plugin upgrade </dev/null || failed+=("marketplace plugins")
+
+if [ ${#failed[@]} -gt 0 ]; then
+  note critical "omp update failed" "Failed: ${failed[*]}. Details: journalctl --user -u aurora-ani-omp-update"
+  exit 1
+fi
+echo "omp $after, all plugins current"

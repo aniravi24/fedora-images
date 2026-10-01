@@ -145,5 +145,8 @@ modules:
         # box just consumes what it pushes. Relies on Linger=yes for the user
         # manager to exist on a headless box with nobody logged in.
         - devbox-dotfiles-pull.timer
+        # omp, bun and omp plugins. Same script as the laptop; on this box it
+        # also relies on Linger=yes to run with nobody logged in.
+        - aurora-ani-omp-update.timer
 
   - type: signing

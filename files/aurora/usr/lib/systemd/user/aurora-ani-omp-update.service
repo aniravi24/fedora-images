@@ -1,0 +1,8 @@
+[Unit]
+Description=Update omp, bun and omp plugins
+ConditionPathExists=/usr/libexec/aurora-ani-omp-update
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/aurora-ani-omp-update
+TimeoutStartSec=15m
