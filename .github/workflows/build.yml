@@ -1,8 +1,10 @@
 name: bluebuild
 on:
   schedule:
-    # Upstream rebuilds aurora-dx:stable weekly, Tuesdays 01:00 UTC.
-    - cron: "00 03 * * TUE"
+    # Saturday night Eastern (Sun 03:00 UTC), a few hours before iot-devbox
+    # applies updates at Sun 04:00 Eastern, so the devbox reboots into a fresh
+    # build. Upstream aurora-dx:stable (Tuesdays 01:00 UTC) is picked up too.
+    - cron: "00 03 * * SUN"
   push:
     branches: [main]
     paths-ignore:

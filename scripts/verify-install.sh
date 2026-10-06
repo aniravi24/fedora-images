@@ -51,8 +51,8 @@ done
 # stages an update - so an unpinned timer can reboot the box mid-afternoon.
 CAL="$(systemctl show bootc-fetch-apply-updates.timer -p TimersCalendar --value 2>/dev/null)"
 case "$CAL" in
-  *04:00:00*) ok "updates apply at 04:00" ;;
-  *)          bad "update timer is not pinned to 04:00 (got: ${CAL:-stock 8-hourly})" ;;
+  *Sun*04:00:00*) ok "updates apply weekly, Sun 04:00" ;;
+  *)              bad "update timer is not pinned to Sun 04:00 (got: ${CAL:-stock 8-hourly})" ;;
 esac
 
 echo "== services =="
